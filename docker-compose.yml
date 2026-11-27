@@ -1,0 +1,204 @@
+name: streambharat
+
+# Core stack (about 6 GB RAM):       docker compose up -d
+# + Airflow (about 1.5 GB more):     docker compose --profile airflow up -d
+# + Metabase dashboards (about 1 GB): docker compose --profile bi up -d
+
+x-spark-common: &spark-common
+  image: streambharat-etl-spark:1.0
+  build:
+    context: ./docker/spark
+  volumes:
+    - ./:/opt/project
+  environment:
+    KAFKA_BOOTSTRAP: kafka:9092
+    PG_URL: jdbc:postgresql://postgres:5432/ottdw
+    PG_USER: ott
+    PG_PASSWORD: ott
+  networks: [net]
+
+services:
+
+  # ---------------- Kafka (KRaft, no ZooKeeper) ----------------
+  kafka:
+    image: apache/kafka:3.8.0
+    hostname: kafka
+    ports:
+      - "9094:9094"          # from your laptop: localhost:9094
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_HEAP_OPTS: -Xmx512m -Xms512m
+    # No volume on purpose: 'docker compose down' wipes Kafka. Run 'make reset' to also clear lake checkpoints.
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+    networks: [net]
+
+  kafka-init:
+    image: apache/kafka:3.8.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/scripts/create_topics.sh"]
+    volumes:
+      - ./docker/kafka/create_topics.sh:/scripts/create_topics.sh:ro
+    restart: "no"
+    networks: [net]
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: streambharat
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      DYNAMIC_CONFIG_ENABLED: "true"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks: [net]
+
+  # ---------------- Spark ----------------
+  spark-master:
+    <<: *spark-common
+    hostname: spark-master
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.master.Master",
+              "--host", "spark-master", "--port", "7077", "--webui-port", "8080"]
+    ports:
+      - "8081:8080"          # Spark master UI
+    environment:
+      SPARK_NO_DAEMONIZE: "true"
+
+  spark-worker:
+    <<: *spark-common
+    depends_on: [spark-master]
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker",
+              "spark://spark-master:7077", "--cores", "2", "--memory", "2g", "--webui-port", "8081"]
+    ports:
+      - "8082:8081"          # Spark worker UI
+    environment:
+      SPARK_NO_DAEMONIZE: "true"
+      KAFKA_BOOTSTRAP: kafka:9092
+
+  # Where you work: Jupyter Lab, spark-submit, pytest, producers
+  workspace:
+    <<: *spark-common
+    hostname: workspace
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      spark-master:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    command: ["jupyter", "lab", "--ip=0.0.0.0", "--port=8888", "--allow-root", "--no-browser",
+              "--ServerApp.token=", "--ServerApp.password=", "--ServerApp.root_dir=/opt/project"]
+    ports:
+      - "8888:8888"          # Jupyter Lab
+      - "4040-4045:4040-4045" # Spark UI of jobs started here
+
+  # ---------------- Serving warehouse ----------------
+  postgres:
+    image: postgres:16.4
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [net]
+
+  # ---------------- Orchestration (profile: airflow) ----------------
+  # Airflow starts Spark jobs as new containers through a locked-down Docker socket proxy.
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    profiles: [airflow]
+    environment:
+      CONTAINERS: 1
+      IMAGES: 1
+      NETWORKS: 1
+      VOLUMES: 1
+      INFO: 1
+      POST: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [net]
+
+  airflow:
+    image: apache/airflow:2.10.3-python3.11
+    profiles: [airflow]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      docker-proxy:
+        condition: service_started
+    command: standalone
+    ports:
+      - "8088:8080"          # Airflow UI (admin / admin)
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DEFAULT_TIMEZONE: Asia/Kolkata
+      AIRFLOW__WEBSERVER__DEFAULT_UI_TIMEZONE: Asia/Kolkata
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+      # Absolute path of this folder ON YOUR LAPTOP (needed to mount it into job containers)
+      PROJECT_DIR: ${PROJECT_DIR:-${PWD}}
+      DOCKER_URL: tcp://docker-proxy:2375
+      DOCKER_NETWORK: streambharat-net
+      SPARK_IMAGE: streambharat-etl-spark:1.0
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - airflow-logs:/opt/airflow/logs
+    networks: [net]
+
+  # ---------------- Dashboards (profile: bi) ----------------
+  metabase:
+    image: metabase/metabase:v0.50.25
+    profiles: [bi]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: metabase
+      MB_DB_PORT: 5432
+      MB_DB_USER: metabase
+      MB_DB_PASS: metabase
+      MB_DB_HOST: postgres
+    networks: [net]
+
+networks:
+  net:
+    name: streambharat-net
+
+volumes:
+  pg-data:
+  airflow-logs:

@@ -1,0 +1,15 @@
+lake/
+data/raw/
+_dryrun/
+.env
+__pycache__/
+.ipynb_checkpoints/
+.pytest_cache/
+spark-warehouse/
+metastore_db/
+derby.log
+lake/ 
+__pycache__/ 
+.pytest_cache/ 
+*.pyc 
+.env

@@ -1,0 +1,27 @@
+# One place for names and paths. Read it with sbetl.common.config.load_config().
+kafka:
+  bootstrap: ${KAFKA_BOOTSTRAP:-kafka:9092}
+  topics:
+    player: ott.player.events
+    subscriptions: ott.billing.subscriptions
+    settlements: ott.billing.settlements
+    search: ott.app.search
+    ratings: ott.app.ratings
+    ad_breaks: ott.ads.breaks
+    impressions: ott.ads.impressions
+    live_plays: ott.live.plays
+    live_ads: ott.live.ads
+    dlq: ott.dlq
+    trending: ott.metrics.trending
+    ad_pacing: ott.alerts.ad_pacing
+    subscription_state: ott.ref.subscription_state
+
+paths:
+  raw: /opt/project/data/raw            # StreamBharat dataset (batch sources)
+  lake: /opt/project/lake               # Delta tables: lake/bronze, lake/silver, lake/gold
+  checkpoints: /opt/project/lake/_checkpoints
+
+warehouse:
+  url: ${PG_URL:-jdbc:postgresql://postgres:5432/ottdw}
+  user: ${PG_USER:-ott}
+  password: ${PG_PASSWORD:-ott}

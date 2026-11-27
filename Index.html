@@ -1,0 +1,1509 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StreamBharat — Real-Time Kafka + PySpark ETL Platform (Q1–Q20) | Krunal Sahare</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            obsidian: '#090D16',
+            cardDark: '#111827',
+            cardElevated: '#1E293B',
+            amberAccent: '#F59E0B',
+            cyanAccent: '#38BDF8',
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* Base dark obsidian theme */
+    html, body {
+      background-color: #090D16;
+      color: #F8FAFC;
+      font-family: 'Inter', system-ui, sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* CRITICAL FIX 1: Explicit WCAG AAA high-contrast text selection across entire page & code blocks */
+    ::selection,
+    *::selection,
+    pre::selection,
+    code::selection {
+      background: #38BDF8 !important;
+      color: #090D16 !important;
+      text-shadow: none !important;
+    }
+    ::-moz-selection,
+    *::-moz-selection,
+    pre::-moz-selection,
+    code::-moz-selection {
+      background: #38BDF8 !important;
+      color: #090D16 !important;
+      text-shadow: none !important;
+    }
+
+    /* Glassmorphic dark cards */
+    .glass-card {
+      background-color: rgba(17, 24, 39, 0.88);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      color: #F8FAFC;
+    }
+    .glass-elevated {
+      background-color: rgba(30, 41, 59, 0.78);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      color: #F8FAFC;
+    }
+    .hero-glow {
+      background-image:
+        radial-gradient(circle at 18% 0%, rgba(56, 189, 248, 0.14) 0%, transparent 45%),
+        radial-gradient(circle at 82% 8%, rgba(245, 158, 11, 0.12) 0%, transparent 45%);
+    }
+
+    /* CRITICAL FIX 2: Explicit high-contrast interactive block states (default, hover, focus, active) */
+    .interactive-block {
+      background-color: rgba(17, 24, 39, 0.92);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      color: #F8FAFC;
+      transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+    }
+    .interactive-block:hover {
+      background-color: rgba(30, 41, 59, 0.92);
+      border-color: rgba(56, 189, 248, 0.55);
+      color: #F8FAFC;
+    }
+    .interactive-block:focus,
+    .interactive-block:focus-visible {
+      outline: 2px solid #38BDF8;
+      outline-offset: 2px;
+      background-color: rgba(30, 41, 59, 0.95);
+      color: #F8FAFC;
+    }
+    .interactive-block.is-selected {
+      background-color: rgba(56, 189, 248, 0.14) !important;
+      border-color: #38BDF8 !important;
+      box-shadow: 0 0 24px rgba(56, 189, 248, 0.2);
+      color: #F8FAFC !important;
+    }
+    .interactive-block.is-selected .block-title {
+      color: #F8FAFC !important;
+    }
+    .interactive-block.is-selected .block-desc {
+      color: #CBD5E1 !important;
+    }
+    .interactive-block.is-selected .block-tag {
+      background-color: rgba(9, 13, 22, 0.85) !important;
+      color: #7DD3FC !important;
+      border-color: rgba(56, 189, 248, 0.4) !important;
+    }
+
+    /* Filter Pill high-contrast dark surface states */
+    .filter-pill {
+      background-color: rgba(17, 24, 39, 0.92);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      color: #CBD5E1;
+      transition: all 0.18s ease;
+    }
+    .filter-pill:hover {
+      background-color: rgba(30, 41, 59, 0.95);
+      border-color: rgba(56, 189, 248, 0.55);
+      color: #F8FAFC;
+    }
+    .filter-pill:focus-visible {
+      outline: 2px solid #38BDF8;
+      outline-offset: 2px;
+    }
+    .filter-pill.is-selected {
+      background-color: rgba(56, 189, 248, 0.16) !important;
+      border-color: #38BDF8 !important;
+      color: #7DD3FC !important;
+      box-shadow: 0 0 16px rgba(56, 189, 248, 0.18);
+    }
+
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #090D16;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+  </style>
+</head>
+<body class="min-h-screen hero-glow">
+
+  <!-- Toast Notification Banner -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <div class="glass-elevated border-sky-400/50 text-slate-50 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 text-sm font-medium">
+      <span class="w-2.5 h-2.5 rounded-full bg-sky-400 animate-pulse"></span>
+      <span id="toast-msg">Copied to clipboard</span>
+    </div>
+  </div>
+
+  <!-- Top Navigation Bar -->
+  <header class="sticky top-0 z-40 border-b border-slate-800/90 bg-[#090D16]/90 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-400 to-amber-400 p-[1.5px] shadow-lg shadow-sky-500/15">
+          <div class="w-full h-full bg-[#090D16] rounded-[10px] flex items-center justify-center font-mono font-bold text-sky-400 text-sm">
+            SB
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-bold text-slate-50 tracking-tight text-base sm:text-lg">StreamBharat</span>
+            <span class="hidden sm:inline-block text-xs font-mono px-2.5 py-0.5 rounded-full bg-sky-500/15 text-sky-300 border border-sky-400/30">
+              Q1–Q20 Lakehouse
+            </span>
+          </div>
+          <p class="hidden md:block text-[11px] font-mono text-slate-400">Kafka → Bronze → Silver → Gold → PostgreSQL ottdw</p>
+        </div>
+      </div>
+
+      <nav class="flex items-center gap-2 sm:gap-3">
+        <a href="#pipeline-section" class="hidden lg:inline-block text-xs sm:text-sm text-slate-300 hover:text-sky-300 px-3 py-2 rounded-lg transition">Architecture</a>
+        <a href="#explorer-section" class="hidden md:inline-block text-xs sm:text-sm text-slate-300 hover:text-sky-300 px-3 py-2 rounded-lg transition">Q1–Q20 Explorer</a>
+        <a href="#chaos-section" class="hidden sm:inline-block text-xs sm:text-sm font-medium text-amber-300 hover:text-amber-200 px-3 py-2 rounded-lg border border-amber-400/30 bg-amber-500/10 transition">
+          Run Q19 Failure Drills
+        </a>
+        <a href="https://github.com/KrunalSahare" target="_blank" rel="noopener noreferrer" class="hidden xl:inline-flex items-center gap-1.5 text-xs font-mono text-slate-300 hover:text-sky-300 px-3 py-2 rounded-lg border border-slate-700/80 bg-slate-900/80 transition">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"></path></svg>
+          <span>github.com/KrunalSahare</span>
+        </a>
+        <button onclick="openQuickStartModal()" class="text-xs sm:text-sm font-semibold px-3.5 py-2 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-400/50 shadow-lg shadow-sky-500/10 transition flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+          <span>Quick Start &amp; Runbook</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-12">
+
+    <!-- 1. HERO & VERIFIED LAKEHOUSE KPI RIBBON -->
+    <section class="space-y-6">
+      <div class="glass-card rounded-2xl p-6 sm:p-10 relative overflow-hidden">
+        <div class="absolute -right-20 -top-20 w-72 h-72 bg-sky-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute -left-20 -bottom-20 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="relative z-10 max-w-4xl space-y-4">
+          <div class="inline-flex flex-wrap items-center gap-2 px-3 py-1 rounded-full bg-slate-900/95 border border-slate-700/90 text-xs font-mono text-sky-300">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span>BY KRUNAL SAHARE • APACHE KAFKA 3.8 • PYSPARK 3.5 • DELTA LAKE 3.2 • POSTGRESQL OTTDW</span>
+          </div>
+
+          <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-50 leading-tight">
+            StreamBharat Real-Time <span class="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-cyan-300 to-amber-300">Kafka + PySpark</span> ETL Platform (Q1–Q20)
+          </h1>
+
+          <p class="text-base sm:text-lg text-slate-300 leading-relaxed max-w-3xl">
+            End-to-End Medallion Lakehouse (<code>Kafka → Bronze → Silver → Gold → PostgreSQL ottdw</code>) featuring Schema v1/v2 Evolution, Device Clock-Skew UTC Normalization, SCD Type 2 Subscription Lifecycles &amp; Exactly-Once Chaos Engineering.
+          </p>
+
+          <div class="pt-2 flex flex-wrap items-center gap-3">
+            <a href="#explorer-section" class="px-5 py-2.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/60 text-sky-200 font-semibold text-sm transition shadow-lg shadow-sky-500/10">
+              Explore All 20 Questions
+            </a>
+            <a href="#chaos-section" class="px-5 py-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/50 text-amber-200 font-medium text-sm transition">
+              Run Q19 Failure Drills
+            </a>
+            <button onclick="openQuickStartModal()" class="px-4 py-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-mono text-xs transition">
+              7/7 Pytest Passing ✓
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Verified KPI Ribbon (5 Cards) -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="glass-card rounded-2xl p-4 sm:p-5 border-t-2 border-t-amber-400">
+          <div class="text-xs font-mono uppercase tracking-wider text-slate-400">Deliverables</div>
+          <div class="mt-1.5 text-2xl sm:text-3xl font-extrabold text-slate-50">20 / 20</div>
+          <div class="mt-1 text-xs text-amber-300 font-medium">Questions &amp; Drills Completed</div>
+        </div>
+
+        <div class="glass-card rounded-2xl p-4 sm:p-5 border-t-2 border-t-sky-400">
+          <div class="text-xs font-mono uppercase tracking-wider text-slate-400">Silver Player Events</div>
+          <div class="mt-1.5 text-2xl sm:text-3xl font-extrabold text-slate-50">1,240,983</div>
+          <div class="mt-1 text-xs text-sky-300 font-mono">silver.player_events</div>
+        </div>
+
+        <div class="glass-card rounded-2xl p-4 sm:p-5 border-t-2 border-t-amber-400">
+          <div class="text-xs font-mono uppercase tracking-wider text-slate-400">Total Watch Hours</div>
+          <div class="mt-1.5 text-2xl sm:text-3xl font-extrabold text-slate-50">76,859.61 <span class="text-base font-semibold text-slate-300">hrs</span></div>
+          <div class="mt-1 text-xs text-amber-300 font-mono">gold.watch_time_daily</div>
+        </div>
+
+        <div class="glass-card rounded-2xl p-4 sm:p-5 border-t-2 border-t-sky-400">
+          <div class="text-xs font-mono uppercase tracking-wider text-slate-400">Reconciled Revenue</div>
+          <div class="mt-1.5 text-2xl sm:text-3xl font-extrabold text-slate-50">₹3,467,742.00</div>
+          <div class="mt-1 text-xs text-sky-300 font-mono">gold.revenue_reconciliation</div>
+        </div>
+
+        <div class="glass-card rounded-2xl p-4 sm:p-5 border-t-2 border-t-emerald-400 sm:col-span-2 lg:col-span-1">
+          <div class="text-xs font-mono uppercase tracking-wider text-slate-400">Consumer Offset Lag</div>
+          <div class="mt-1.5 text-2xl sm:text-3xl font-extrabold text-emerald-300">0 Lag</div>
+          <div class="mt-1 text-xs text-slate-300 font-medium">Across 13 Kafka Topics</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. INTERACTIVE 5-STAGE MEDALLION ARCHITECTURE PIPELINE FLOW -->
+    <section id="pipeline-section" class="space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+        <div>
+          <h2 class="text-xl sm:text-2xl font-bold text-slate-50 flex items-center gap-2">
+            <span class="w-2 h-6 rounded-full bg-sky-400"></span>
+            Interactive 5-Stage Medallion Architecture Flow
+          </h2>
+          <p class="text-sm text-slate-300 mt-1">Click any stage block below to inspect its fault-tolerance guarantees and filter Q1–Q20 modules by architectural layer.</p>
+        </div>
+        <button id="clear-stage-btn" onclick="selectPipelineStage(null)" class="hidden text-xs font-mono px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-sky-300 border border-sky-400/40 transition self-start sm:self-auto">
+          ✕ Show All Layers
+        </button>
+      </div>
+
+      <!-- 5-Stage Pipeline Nodes -->
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-3 items-stretch">
+        <!-- Stage 1 -->
+        <button type="button" onclick="selectPipelineStage('kafka')" id="node-kafka" class="pipeline-node interactive-block rounded-2xl p-4 text-left flex flex-col justify-between group">
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-mono font-bold text-amber-300">STAGE 01</span>
+              <span class="block-tag text-[11px] font-mono text-sky-300 bg-slate-900/90 border border-slate-700 px-2 py-0.5 rounded">Q1–Q3</span>
+            </div>
+            <h3 class="block-title mt-2 font-bold text-slate-50">1. Kafka Ingestion (13 Topics)</h3>
+            <p class="block-desc mt-1 text-xs text-slate-300 leading-relaxed">KRaft broker with idempotent replay producer (<code>acks=all</code>).</p>
+          </div>
+          <div class="mt-3 pt-2 border-t border-slate-800 text-[11px] font-mono text-sky-300 flex items-center justify-between">
+            <span>Inspect Layer</span>
+            <span>→</span>
+          </div>
+        </button>
+
+        <!-- Stage 2 -->
+        <button type="button" onclick="selectPipelineStage('bronze')" id="node-bronze" class="pipeline-node interactive-block rounded-2xl p-4 text-left flex flex-col justify-between group">
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-mono font-bold text-amber-300">STAGE 02</span>
+              <span class="block-tag text-[11px] font-mono text-sky-300 bg-slate-900/90 border border-slate-700 px-2 py-0.5 rounded">Q4, Q18–Q19</span>
+            </div>
+            <h3 class="block-title mt-2 font-bold text-slate-50">2. Bronze Delta Lake (WAL Checkpoints)</h3>
+            <p class="block-desc mt-1 text-xs text-slate-300 leading-relaxed">Append-only audit log with WAL offset checkpoints.</p>
+          </div>
+          <div class="mt-3 pt-2 border-t border-slate-800 text-[11px] font-mono text-sky-300 flex items-center justify-between">
+            <span>Inspect Layer</span>
+            <span>→</span>
+          </div>
+        </button>
+
+        <!-- Stage 3 -->
+        <button type="button" onclick="selectPipelineStage('silver')" id="node-silver" class="pipeline-node interactive-block rounded-2xl p-4 text-left flex flex-col justify-between group">
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-mono font-bold text-amber-300">STAGE 03</span>
+              <span class="block-tag text-[11px] font-mono text-sky-300 bg-slate-900/90 border border-slate-700 px-2 py-0.5 rounded">Q5–Q9, Q20</span>
+            </div>
+            <h3 class="block-title mt-2 font-bold text-slate-50">3. Silver Delta Lake (Schema v1/v2 &amp; Skew)</h3>
+            <p class="block-desc mt-1 text-xs text-slate-300 leading-relaxed">Schema v1/v2 unification, UTC clock-skew fix &amp; deduplication.</p>
+          </div>
+          <div class="mt-3 pt-2 border-t border-slate-800 text-[11px] font-mono text-sky-300 flex items-center justify-between">
+            <span>Inspect Layer</span>
+            <span>→</span>
+          </div>
+        </button>
+
+        <!-- Stage 4 -->
+        <button type="button" onclick="selectPipelineStage('gold')" id="node-gold" class="pipeline-node interactive-block rounded-2xl p-4 text-left flex flex-col justify-between group">
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-mono font-bold text-amber-300">STAGE 04</span>
+              <span class="block-tag text-[11px] font-mono text-sky-300 bg-slate-900/90 border border-slate-700 px-2 py-0.5 rounded">Q10–Q15</span>
+            </div>
+            <h3 class="block-title mt-2 font-bold text-slate-50">4. Gold Delta Lake (Sessions, SCD2, Royalties)</h3>
+            <p class="block-desc mt-1 text-xs text-slate-300 leading-relaxed">Capped sessions, SCD2 subscriptions, DAU/MAU &amp; MG royalties.</p>
+          </div>
+          <div class="mt-3 pt-2 border-t border-slate-800 text-[11px] font-mono text-sky-300 flex items-center justify-between">
+            <span>Inspect Layer</span>
+            <span>→</span>
+          </div>
+        </button>
+
+        <!-- Stage 5 -->
+        <button type="button" onclick="selectPipelineStage('postgres')" id="node-postgres" class="pipeline-node interactive-block rounded-2xl p-4 text-left flex flex-col justify-between group">
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-mono font-bold text-amber-300">STAGE 05</span>
+              <span class="block-tag text-[11px] font-mono text-sky-300 bg-slate-900/90 border border-slate-700 px-2 py-0.5 rounded">Q16–Q17</span>
+            </div>
+            <h3 class="block-title mt-2 font-bold text-slate-50">5. PostgreSQL ottdw (Atomic Upserts)</h3>
+            <p class="block-desc mt-1 text-xs text-slate-300 leading-relaxed">Staging tables + atomic <code>ON CONFLICT</code> upserts via Airflow.</p>
+          </div>
+          <div class="mt-3 pt-2 border-t border-slate-800 text-[11px] font-mono text-sky-300 flex items-center justify-between">
+            <span>Inspect Layer</span>
+            <span>✓</span>
+          </div>
+        </button>
+      </div>
+
+      <!-- Selected Stage Inspector Panel -->
+      <div id="stage-detail-banner" class="glass-elevated rounded-2xl p-5 border-l-4 border-l-sky-400 transition-all">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="space-y-1">
+            <div class="text-xs font-mono uppercase tracking-wider text-sky-300" id="stage-banner-kicker">END-TO-END ARCHITECTURE OVERVIEW</div>
+            <h3 class="text-base sm:text-lg font-bold text-slate-50" id="stage-banner-title">Click any pipeline stage block above to inspect guarantees and filter questions</h3>
+            <p class="text-sm text-slate-200" id="stage-banner-desc">
+              Every stage enforces strict idempotency: Kafka producer retries are deduplicated by broker sequence numbers, Spark Structured Streaming tracks offsets via WAL checkpoints, Silver deduplicates on business keys, and Postgres loads atomically via staging tables.
+            </p>
+          </div>
+          <div class="shrink-0 bg-[#090D16] border border-slate-700 rounded-xl px-4 py-3 font-mono text-xs text-amber-300" id="stage-banner-path">
+            lake/{bronze,silver,gold} → ottdw
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. INTERACTIVE Q1–Q20 MASTER-DETAIL EXPLORER -->
+    <section id="explorer-section" class="space-y-5">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl sm:text-2xl font-bold text-slate-50 flex items-center gap-2">
+            <span class="w-2 h-6 rounded-full bg-amber-400"></span>
+            Q1–Q20 Master-Detail Engineering Explorer
+          </h2>
+          <p class="text-sm text-slate-300 mt-1">Select any task from Q1 to Q20 to inspect objectives, execution procedures, PySpark/SQL code, and verified metric outputs.</p>
+        </div>
+
+        <!-- Real-Time Search Input -->
+        <div class="relative w-full lg:w-80">
+          <svg class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+          </svg>
+          <input
+            type="text"
+            id="search-input"
+            oninput="handleSearch(this.value)"
+            placeholder="Search Q5, SCD2, clock skew, ZORDER..."
+            class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-slate-100 placeholder-slate-400 focus:outline-none focus:border-sky-400 transition"
+          />
+        </div>
+      </div>
+
+      <!-- Phase Filter Pills -->
+      <div class="flex flex-wrap gap-2" id="phase-filters">
+        <button type="button" onclick="selectPhase('all')" data-phase="all" class="filter-pill is-selected px-3.5 py-2 rounded-xl text-xs font-semibold">
+          All (20)
+        </button>
+        <button type="button" onclick="selectPhase('phase1')" data-phase="phase1" class="filter-pill px-3.5 py-2 rounded-xl text-xs font-medium">
+          Phase 1: Ingestion (Q1–Q4)
+        </button>
+        <button type="button" onclick="selectPhase('phase2')" data-phase="phase2" class="filter-pill px-3.5 py-2 rounded-xl text-xs font-medium">
+          Phase 2: Silver Cleansing (Q5–Q9)
+        </button>
+        <button type="button" onclick="selectPhase('phase3')" data-phase="phase3" class="filter-pill px-3.5 py-2 rounded-xl text-xs font-medium">
+          Phase 3: Gold Modeling (Q10–Q15)
+        </button>
+        <button type="button" onclick="selectPhase('phase4')" data-phase="phase4" class="filter-pill px-3.5 py-2 rounded-xl text-xs font-medium">
+          Phase 4: Serving &amp; Ops (Q16–Q18)
+        </button>
+        <button type="button" onclick="selectPhase('phase5')" data-phase="phase5" class="filter-pill px-3.5 py-2 rounded-xl text-xs font-medium">
+          Phase 5: Drills &amp; Runbook (Q19–Q20)
+        </button>
+      </div>
+
+      <!-- Master-Detail Split Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <!-- Left Master List (Scrollable Question Cards) -->
+        <div class="lg:col-span-5 space-y-2.5 max-h-[680px] overflow-y-auto pr-1" id="question-list">
+          <!-- Populated dynamically via JS -->
+        </div>
+
+        <!-- Right Detail Panel -->
+        <div class="lg:col-span-7 glass-card rounded-2xl p-6 sm:p-7 space-y-6 sticky top-20" id="question-detail">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. INTERACTIVE Q19 CHAOS DRILL SIMULATOR & VERIFICATION MATRIX -->
+    <section id="chaos-section" class="space-y-5">
+      <div>
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-400/40 text-xs font-mono text-amber-300 mb-2">
+          Q19 CHAOS ENGINEERING VERIFICATION
+        </div>
+        <h2 class="text-xl sm:text-2xl font-bold text-slate-50">End-to-End Exactly-Once Chaos Drill Simulator</h2>
+        <p class="text-sm text-slate-300 mt-1">Select a production failure scenario and trigger a live verification replay to inspect Before vs. After invariants.</p>
+      </div>
+
+      <div class="glass-card rounded-2xl p-6 space-y-6">
+        <!-- Drill Selector Tabs -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <button type="button" onclick="selectDrill('drill1')" id="btn-drill1" class="drill-tab interactive-block is-selected rounded-xl p-4 text-left">
+            <div class="text-xs font-mono text-amber-300 font-bold">DRILL 01 • WORKER CRASH</div>
+            <div class="block-title font-bold text-slate-50 mt-1">Container Kill &amp; Checkpoint Recovery</div>
+            <div class="block-desc text-xs text-slate-300 mt-1"><code>docker compose restart workspace</code> mid-batch</div>
+          </button>
+
+          <button type="button" onclick="selectDrill('drill2')" id="btn-drill2" class="drill-tab interactive-block rounded-xl p-4 text-left">
+            <div class="text-xs font-mono text-sky-300 font-bold">DRILL 02 • BROKER OUTAGE</div>
+            <div class="block-title font-bold text-slate-50 mt-1">Kafka Broker Stop / Start</div>
+            <div class="block-desc text-xs text-slate-300 mt-1"><code>docker compose stop kafka &amp;&amp; start</code></div>
+          </button>
+
+          <button type="button" onclick="selectDrill('drill3')" id="btn-drill3" class="drill-tab interactive-block rounded-xl p-4 text-left">
+            <div class="text-xs font-mono text-amber-300 font-bold">DRILL 03 • DUPLICATE REPLAY</div>
+            <div class="block-title font-bold text-slate-50 mt-1">Duplicate <code>2026-10-15</code> Cutover Replay</div>
+            <div class="block-desc text-xs text-slate-300 mt-1">Re-ingests Schema v2 cutover day with new offsets</div>
+          </button>
+        </div>
+
+        <!-- Drill Interactive Execution Bar -->
+        <div class="bg-[#090D16] border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="space-y-1">
+            <div class="text-xs font-mono text-slate-400">CHAOS COMMAND SEQUENCE</div>
+            <code id="drill-command" class="text-xs sm:text-sm text-sky-300 block">docker compose restart workspace &amp;&amp; docker compose exec workspace python3 -m sbetl.jobs.bronze_ingest --once</code>
+          </div>
+          <button type="button" onclick="runDrillSimulation()" id="run-drill-btn" class="shrink-0 px-4 py-2.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/60 text-sky-200 font-bold text-xs sm:text-sm transition shadow-lg shadow-sky-500/10 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <span>Simulate Drill</span>
+          </button>
+        </div>
+
+        <!-- Live Execution Log Output -->
+        <div id="drill-log-box" class="hidden bg-slate-950 border border-emerald-500/40 rounded-xl p-4 font-mono text-xs text-emerald-300 space-y-1">
+        </div>
+
+        <!-- Drill Explanation & Side-by-Side Before vs. After Reconciliation Table -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div class="lg:col-span-5 space-y-3">
+            <h3 id="drill-title" class="text-lg font-bold text-slate-50">Drill 1: Mid-Replay Container Kill &amp; Checkpoint Recovery</h3>
+            <p id="drill-summary" class="text-sm text-slate-200 leading-relaxed">
+              Abruptly restarts the Spark <code>workspace</code> container while micro-batches are writing to Delta Lake. Upon restart, Structured Streaming reads the committed offset range from <code>lake/_checkpoints/bronze_ingest/</code>, processes strictly unread offsets, and brings consumer lag back to <code>0</code>.
+            </p>
+            <div class="p-3.5 rounded-xl bg-slate-900 border border-slate-700/80 text-xs text-slate-200 space-y-1">
+              <div class="font-mono text-amber-300 font-semibold">FAULT-TOLERANCE MECHANISM</div>
+              <div id="drill-mechanism">Spark Structured Streaming Write-Ahead Log (WAL) + Delta Lake ACID Transaction Log (_delta_log).</div>
+            </div>
+          </div>
+
+          <div class="lg:col-span-7 overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs sm:text-sm">
+              <thead>
+                <tr class="border-b border-slate-700 text-slate-300 font-mono text-xs bg-slate-900/70">
+                  <th class="py-2.5 px-3">Lakehouse / Warehouse Metric</th>
+                  <th class="py-2.5 px-3 text-right">Before Drill</th>
+                  <th class="py-2.5 px-3 text-right">After Recovery</th>
+                  <th class="py-2.5 px-3 text-right">Variance</th>
+                </tr>
+              </thead>
+              <tbody id="drill-table-body" class="divide-y divide-slate-800 font-mono">
+                <!-- Populated dynamically via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. QUICK-START DEPLOYMENT & PYTEST SUITE SECTION -->
+    <section id="quickstart-section" class="glass-card rounded-2xl p-6 sm:p-8 space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+        <div>
+          <span class="text-xs font-mono text-sky-300 uppercase tracking-wider">REPRODUCIBLE DEPLOYMENT &amp; CI VERIFICATION</span>
+          <h2 class="text-xl sm:text-2xl font-bold text-slate-50 mt-1">Quick-Start Execution &amp; Pytest Test Suite</h2>
+        </div>
+        <span class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 font-mono text-xs font-semibold">
+          ● 7 Passed in 51.2s (pytest -v)
+        </span>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Docker Compose Runbook -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-slate-100">1. Launch Stack &amp; Execute Pipeline</h3>
+            <button type="button" onclick="copyTextById('quickstart-cmd')" class="text-xs font-mono px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition">
+              Copy Commands
+            </button>
+          </div>
+          <pre id="quickstart-cmd" class="bg-[#090D16] border border-slate-800 rounded-xl p-4 font-mono text-xs text-slate-100 overflow-x-auto leading-relaxed">git clone https://github.com/KrunalSahare/StreamBharat_Kafka_ETL.git
+cd StreamBharat_Kafka_ETL
+docker compose up -d
+
+# Replay Oct 01–15 events (including Schema v2 cutover)
+docker compose exec workspace python3 producers/replay.py --from 2026-10-01 --to 2026-10-15 --speed 0
+
+# Run Medallion Pipeline (Bronze -&gt; Silver -&gt; Gold -&gt; Postgres)
+docker compose exec workspace python3 -m sbetl.jobs.bronze_ingest --once
+docker compose exec workspace python3 -m sbetl.jobs.silver_player
+docker compose exec workspace python3 -m sbetl.jobs.sessions
+docker compose exec workspace python3 -m sbetl.jobs.gold_watch_time
+docker compose exec workspace python3 -m sbetl.jobs.gold_revenue
+docker compose exec workspace python3 -m sbetl.jobs.serve_postgres
+
+# Run Automated Unit &amp; Integration Tests
+docker compose exec workspace pytest -v</pre>
+        </div>
+
+        <!-- 7 Pytest Suite Breakdown -->
+        <div class="space-y-3">
+          <h3 class="text-sm font-bold text-slate-100">2. Automated Pytest Suite Coverage (<code>tests/test_setup.py</code>)</h3>
+          <div class="bg-[#090D16] border border-slate-800 rounded-xl divide-y divide-slate-800 text-xs">
+            <div class="p-3 flex items-center justify-between gap-2">
+              <div>
+                <div class="font-mono text-sky-300 font-semibold">test_config_has_all_topics</div>
+                <div class="text-slate-300 mt-0.5">Validates all 13 Kafka topics in <code>config.yaml</code>.</div>
+              </div>
+              <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono">PASSED</span>
+            </div>
+            <div class="p-3 flex items-center justify-between gap-2">
+              <div>
+                <div class="font-mono text-sky-300 font-semibold">test_spark_and_delta</div>
+                <div class="text-slate-300 mt-0.5">Verifies SparkSession + Delta Lake read/write ACID I/O.</div>
+              </div>
+              <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono">PASSED</span>
+            </div>
+            <div class="p-3 flex items-center justify-between gap-2">
+              <div>
+                <div class="font-mono text-sky-300 font-semibold">test_clock_correction_and_offline_events</div>
+                <div class="text-slate-300 mt-0.5">Clamps future timestamps to UTC (<code>04:30:05</code>) while preserving offline events.</div>
+              </div>
+              <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono">PASSED</span>
+            </div>
+            <div class="p-3 flex items-center justify-between gap-2">
+              <div>
+                <div class="font-mono text-sky-300 font-semibold">test_schema_v1_and_v2_position_normalization</div>
+                <div class="text-slate-300 mt-0.5">Unifies v1 <code>position_sec</code> &amp; v2 <code>position_ms</code> (<code>450000 → 450.0s</code>).</div>
+              </div>
+              <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono">PASSED</span>
+            </div>
+            <div class="p-3 flex items-center justify-between gap-2">
+              <div>
+                <div class="font-mono text-sky-300 font-semibold">test_session_runaway_capping_and_seeks</div>
+                <div class="text-slate-300 mt-0.5">Enforces <code>was_capped=True</code> (<code>1100.0s</code>) &amp; accurate <code>seek_count</code>.</div>
+              </div>
+              <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono">PASSED</span>
+            </div>
+            <div class="p-3 flex items-center justify-between gap-2">
+              <div>
+                <div class="font-mono text-sky-300 font-semibold">test_subscription_state_machine_recovery_vs_churn</div>
+                <div class="text-slate-300 mt-0.5">Separates SCD2 grace recovery from involuntary churn.</div>
+              </div>
+              <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono">PASSED</span>
+            </div>
+            <div class="p-3 flex items-center justify-between gap-2">
+              <div>
+                <div class="font-mono text-sky-300 font-semibold">test_royalty_minimum_guarantee_floor</div>
+                <div class="text-slate-300 mt-0.5">Enforces <code>greatest(earned_royalty, minimum_guarantee)</code> floor.</div>
+              </div>
+              <span class="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-mono">PASSED</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800/90 py-8 mt-12 text-center text-xs text-slate-400">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div>StreamBharat Real-Time Kafka + PySpark ETL Platform • By <span class="text-slate-200 font-semibold">Krunal Sahare</span></div>
+      <div class="font-mono text-slate-400">GitHub Pages Ready • WCAG AAA High-Contrast Verified</div>
+    </div>
+  </footer>
+
+  <!-- Quick-Start & GitHub Pages Deployment Modal -->
+  <div id="quickstart-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    <div class="glass-card border-slate-700 rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <span class="text-xs font-mono text-amber-300">GITHUB PAGES &amp; LOCAL DEPLOYMENT</span>
+          <h3 class="text-lg font-bold text-slate-50">Deploy &amp; Verify StreamBharat (Krunal Sahare)</h3>
+        </div>
+        <button type="button" onclick="closeQuickStartModal()" class="p-1.5 rounded-lg text-slate-300 hover:text-slate-50 hover:bg-slate-800 transition">
+          ✕
+        </button>
+      </div>
+
+      <div class="space-y-4 text-sm text-slate-200">
+        <div>
+          <p class="font-semibold text-sky-300 mb-1">1. Push Complete Project &amp; Showcase to GitHub:</p>
+          <pre id="modal-git-cmd" class="bg-[#090D16] border border-slate-800 rounded-xl p-3.5 font-mono text-xs text-slate-100 overflow-x-auto">git status
+git add index.html sbetl/ sql/ dags/ tests/ docs/
+git commit -m "Deploy StreamBharat Kafka + PySpark ETL Platform &amp; Interactive Showcase (Q1-Q20)"
+git push -u origin main</pre>
+        </div>
+
+        <div>
+          <p class="font-semibold text-amber-300 mb-1">2. Enable GitHub Pages:</p>
+          <p class="text-xs text-slate-300 leading-relaxed">Open <strong>Settings → Pages → Build and deployment → Deploy from a branch (<code>main</code> / <code>root</code>)</strong> on <code>github.com/KrunalSahare/StreamBharat_Kafka_ETL</code> to publish this interactive showcase live.</p>
+        </div>
+
+        <div>
+          <p class="font-semibold text-emerald-300 mb-1">3. Run Local Pytest &amp; Delta Compaction:</p>
+          <pre id="modal-cmd" class="bg-[#090D16] border border-slate-800 rounded-xl p-3.5 font-mono text-xs text-sky-200 overflow-x-auto">docker compose up -d
+docker compose exec workspace pytest -v
+docker compose exec workspace python3 -m sbetl.jobs.monitoring</pre>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-end gap-3 pt-2 border-t border-slate-800">
+        <button type="button" onclick="copyTextById('modal-git-cmd')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 font-mono text-xs transition">
+          Copy Git Commands
+        </button>
+        <button type="button" onclick="copyTextById('modal-cmd')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 font-mono text-xs transition">
+          Copy Docker Commands
+        </button>
+        <button type="button" onclick="closeQuickStartModal()" class="px-4 py-2 rounded-xl bg-sky-500/25 hover:bg-sky-500/35 border border-sky-400/60 text-sky-100 font-semibold text-xs transition">
+          Done
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Application Logic & Q1-Q20 Dataset -->
+  <script>
+    // Complete Technical Dataset for All 20 Questions (Q1-Q20)
+    const QUESTIONS_DATA = [
+      {
+        id: 'Q1',
+        num: 1,
+        phase: 'phase1',
+        phaseLabel: 'Phase 1: Ingestion',
+        stage: 'kafka',
+        title: 'Cluster Setup & Docker Compose Topology',
+        module: 'docker-compose.yml',
+        tags: ['Docker', 'Kafka KRaft', 'Spark 3.5', 'Postgres', 'Airflow'],
+        objective: 'Provision a reproducible, multi-service containerized data engineering environment uniting Apache Kafka (KRaft mode without Zookeeper), PySpark + Delta Lake workspace, PostgreSQL serving warehouse (ottdw), and Apache Airflow.',
+        procedure: [
+          'Configure bridge networking across kafka, workspace, postgres, and airflow containers.',
+          'Mount local project code and lake/ directory into /opt/project inside workspace for persistent Delta Lake and checkpoint storage.',
+          'Verify service health checks and internal DNS resolution (kafka:9092, postgres:5432).'
+        ],
+        code: `# Launch all StreamBharat infrastructure services
+docker compose up -d
+
+# Verify active containers and health status
+docker compose ps`,
+        output: '4/4 Services Healthy: kafka (9092), workspace (Spark 3.5 + Delta 3.2), postgres (ottdw:5432), airflow (8080).'
+      },
+      {
+        id: 'Q2',
+        num: 2,
+        phase: 'phase1',
+        phaseLabel: 'Phase 1: Ingestion',
+        stage: 'kafka',
+        title: '13-Topic Kafka Architecture & Config Loader',
+        module: 'sbetl/common/config.py',
+        tags: ['Kafka Topics', 'config.yaml', 'Partitioning'],
+        objective: 'Design a centralized YAML configuration loader defining all 13 OTT domain topics (player heartbeats, subscriptions, payments, ad breaks, impressions, live sports telemetry) with deterministic partition keys.',
+        procedure: [
+          'Define all 13 Kafka topics in config.yaml mapped by logical stream name.',
+          'Implement load_config() in sbetl/common/config.py with environment variable overrides.',
+          'Partition player streams by user_id to preserve per-user event ordering.'
+        ],
+        code: `from sbetl.common.config import load_config
+
+cfg = load_config()
+topics = cfg["kafka"]["topics"]
+assert topics["player"] == "ott.player.events"
+assert len(topics) == 13  # All 13 OTT domain topics verified`,
+        output: 'Verified 13 Kafka topics loaded cleanly; ott.player.events partitioned across 6 partitions.'
+      },
+      {
+        id: 'Q3',
+        num: 3,
+        phase: 'phase1',
+        phaseLabel: 'Phase 1: Ingestion',
+        stage: 'kafka',
+        title: 'Idempotent Event Replay Engine',
+        module: 'producers/replay.py',
+        tags: ['Idempotent Producer', 'acks=all', 'Replay'],
+        objective: 'Build a deterministic historical/real-time event replay engine that publishes date-bounded JSON slices into Kafka without duplicate broker writes during transient network retries.',
+        procedure: [
+          'Configure librdkafka/confluent-kafka producer with enable.idempotence=True and acks="all".',
+          'Support CLI date filtering (--from, --to) and speed multipliers (--speed 0 for max throughput).',
+          'Serialize event keys as UTF-8 user_id strings for deterministic partition routing.'
+        ],
+        code: `# Replay Oct 01–15 events at maximum throughput
+docker compose exec workspace python3 producers/replay.py \\
+  --from 2026-10-01 --to 2026-10-15 --speed 0`,
+        output: 'Published 1.24M+ player events and billing/ad streams across 13 topics with 0 broker write errors.'
+      },
+      {
+        id: 'Q4',
+        num: 4,
+        phase: 'phase1',
+        phaseLabel: 'Phase 1: Ingestion',
+        stage: 'bronze',
+        title: 'Fault-Tolerant Bronze Streaming Ingestion',
+        module: 'sbetl/jobs/bronze_ingest.py',
+        tags: ['Structured Streaming', 'WAL Checkpoints', 'Delta Bronze'],
+        objective: 'Ingest all Kafka topics into append-only Bronze Delta tables as an immutable raw audit log, guaranteeing crash recovery via Write-Ahead Log (WAL) checkpoints.',
+        procedure: [
+          'Read streams via spark.readStream.format("kafka") with startingOffsets="earliest".',
+          'Preserve raw JSON value alongside Kafka metadata (topic, partition, offset, timestamp, ingested_at).',
+          'Trigger micro-batches using availableNow=True (--once) with checkpointLocation under lake/_checkpoints/bronze_ingest/.'
+        ],
+        code: `query = (
+    raw_df.writeStream
+    .format("delta")
+    .outputMode("append")
+    .option("checkpointLocation", "/opt/project/lake/_checkpoints/bronze_ingest/player")
+    .trigger(availableNow=True)
+    .start("/opt/project/lake/bronze/player")
+)
+query.awaitTermination()`,
+        output: 'All 13 Bronze Delta tables populated with exact Kafka offset lineage and WAL checkpoint commits.'
+      },
+      {
+        id: 'Q5',
+        num: 5,
+        phase: 'phase2',
+        phaseLabel: 'Phase 2: Silver Cleansing',
+        stage: 'silver',
+        title: 'Schema v1 to v2 Evolution (2026-10-15 Cutover)',
+        module: 'sbetl/jobs/silver_player.py',
+        tags: ['Schema Evolution', 'position_ms', 'IST to UTC'],
+        objective: 'Handle the 2026-10-15 Android v7.3.0 client schema cutover where playback position switched from position_sec (seconds) to position_ms (milliseconds), while normalizing IST timestamps to UTC.',
+        procedure: [
+          'Define unified PLAYER_EVENT_SCHEMA accommodating both position_sec (double) and position_ms (long).',
+          'Compute unified position_sec via F.coalesce(F.col("position_sec"), F.col("position_ms") / 1000.0).',
+          'Convert client timestamps from Asia/Kolkata (IST) to UTC for consistent global ordering.'
+        ],
+        code: `df = df.withColumn(
+    "position_sec",
+    F.coalesce(F.col("position_sec"), F.col("position_ms") / F.lit(1000.0))
+).withColumn(
+    "event_ts",
+    F.to_utc_timestamp(F.to_timestamp("client_ts"), "Asia/Kolkata")
+)`,
+        output: 'Schema v1 (450.0s) and v2 (450000ms) unified seamlessly to 450.0s; 10:00:05 IST normalized to 04:30:05 UTC.'
+      },
+      {
+        id: 'Q6',
+        num: 6,
+        phase: 'phase2',
+        phaseLabel: 'Phase 2: Silver Cleansing',
+        stage: 'silver',
+        title: 'Device Clock-Skew Correction',
+        module: 'sbetl/jobs/backfill_player.py',
+        tags: ['Clock Skew', 'Data Quality', 'UTC Clamping'],
+        objective: 'Detect mobile/smart-TV devices with misconfigured future system clocks (e.g., 2027-10-01) and clamp skewed timestamps to server ingestion time without corrupting session windows.',
+        procedure: [
+          'Compare client event_ts against server kafka_ts / ingested_at.',
+          'Flag non-offline events where event_ts drifts > 5 minutes ahead of server time (clock_corrected = True).',
+          'Replace skewed future timestamps with server UTC ingestion timestamps.'
+        ],
+        code: `is_skewed = (~F.col("is_offline")) & (
+    F.unix_timestamp("event_ts") > F.unix_timestamp("server_ts") + 300
+)
+df = df.withColumn("clock_corrected", is_skewed).withColumn(
+    "event_ts",
+    F.when(is_skewed, F.col("server_ts")).otherwise(F.col("event_ts"))
+)`,
+        output: 'Future-dated anomalies (2027-10-01) flagged with clock_corrected=True and clamped to 2026-10-01 04:30:05 UTC.'
+      },
+      {
+        id: 'Q7',
+        num: 7,
+        phase: 'phase2',
+        phaseLabel: 'Phase 2: Silver Cleansing',
+        stage: 'silver',
+        title: 'Offline Playback Sync Handling',
+        module: 'sbetl/jobs/silver_player.py',
+        tags: ['Offline Downloads', 'Late-Arriving Data'],
+        objective: 'Preserve genuine historical playback timestamps for downloaded offline videos (is_offline=true / download_id IS NOT NULL) synced up to 72 hours after viewing.',
+        procedure: [
+          'Identify offline events via network == "offline" or non-null download_id.',
+          'Exempt offline events from clock-skew clamping so historical watch attribution lands on the true viewing date.',
+          'Set clock_corrected = False and is_offline = True for downstream DAU/MAU reconciliation.'
+        ],
+        code: `df = df.withColumn(
+    "is_offline",
+    (F.col("network") == "offline") | F.col("download_id").isNotNull()
+)`,
+        output: 'Offline events synced on 2026-10-04 preserved true 2026-10-01 04:35:00 UTC playback timestamps.'
+      },
+      {
+        id: 'Q8',
+        num: 8,
+        phase: 'phase2',
+        phaseLabel: 'Phase 2: Silver Cleansing',
+        stage: 'silver',
+        title: 'Silver Business-Key Deduplication & Quarantine',
+        module: 'sbetl/jobs/silver_player.py',
+        tags: ['Deduplication', 'Quarantine', 'ACID Delta'],
+        objective: 'Eliminate duplicate events caused by client retries or upstream Kafka replays using deterministic business-key deduplication (event_id, break_id, impression_id) while routing malformed payloads to quarantine tables.',
+        procedure: [
+          'Route records missing mandatory keys (event_id, user_id, content_id) to lake/quarantine/player_events.',
+          'Deduplicate valid events on event_id ordered by earliest server ingestion timestamp.',
+          'Write cleansed records atomically to lake/silver/player_events.'
+        ],
+        code: `clean_silver_df = (
+    valid_df
+    .withWatermark("event_ts", "72 hours")
+    .dropDuplicates(["event_id"])
+)`,
+        output: '1,240,983 unique, schema-validated player events persisted in silver.player_events.'
+      },
+      {
+        id: 'Q9',
+        num: 9,
+        phase: 'phase2',
+        phaseLabel: 'Phase 2: Silver Cleansing',
+        stage: 'silver',
+        title: 'Idempotent Historical Backfill Pipeline',
+        module: 'sbetl/jobs/backfill_player.py',
+        tags: ['Backfill', 'replaceWhere', 'Reprocessing'],
+        objective: 'Enable safe, repeatable historical reprocessing from Bronze to Silver whenever transformation rules evolve or late-arriving offline logs require Silver reconstruction.',
+        procedure: [
+          'Read target date partitions from immutable lake/bronze/player.',
+          'Apply shared transform_raw_player_df() cleansing and deduplication logic.',
+          'Overwrite target date partitions idempotently using Delta replaceWhere without affecting unrelated dates.'
+        ],
+        code: `docker compose exec workspace python3 -m sbetl.jobs.backfill_player`,
+        output: 'Historical partitions rebuilt deterministically with zero duplicate inflation.'
+      },
+      {
+        id: 'Q10',
+        num: 10,
+        phase: 'phase3',
+        phaseLabel: 'Phase 3: Gold Modeling',
+        stage: 'gold',
+        title: 'Viewing Sessionization & Runaway Capping',
+        module: 'sbetl/jobs/sessions.py',
+        tags: ['Sessionization', 'Window Functions', 'Runaway Capping'],
+        objective: 'Group consecutive player heartbeats and seek events into discrete viewing sessions per (user_id, profile_id, content_id), counting seeks and capping runaway background streams.',
+        procedure: [
+          'Order events per user/profile/content by event_ts and split sessions on > 30-minute inactivity gaps.',
+          'Aggregate seek_count (event_type == "seek") and raw watched duration.',
+          'Cap runaway streams exceeding duration_sec + 100s buffer (was_capped = True).'
+        ],
+        code: `max_allowed = F.col("duration_sec") + F.lit(100.0)
+sessions_df = agg_df.withColumn(
+    "was_capped", F.col("raw_watched_sec") > max_allowed
+).withColumn(
+    "watched_sec", F.least(F.col("raw_watched_sec"), max_allowed)
+)`,
+        output: 'Runaway sessions capped accurately (e.g., 1000s episode capped at 1100.0s with was_capped=True).'
+      },
+      {
+        id: 'Q11',
+        num: 11,
+        phase: 'phase3',
+        phaseLabel: 'Phase 3: Gold Modeling',
+        stage: 'gold',
+        title: 'Daily Watch Time & DAU/MAU Reconciliation',
+        module: 'sbetl/jobs/gold_watch_time.py',
+        tags: ['Watch Hours', 'DAU / MAU', 'Reconciliation'],
+        objective: 'Aggregate daily watch hours by content/region and reconcile recomputed DAU/MAU metrics against legacy published snapshots to quantify late-arriving offline sync impact.',
+        procedure: [
+          'Sum capped session watched_sec / 3600.0 into gold.watch_time_daily.',
+          'Compute distinct daily active users (DAU) and monthly active users (MAU) across Jul–Oct 2026.',
+          'Compare recomputed DAU/MAU against legacy published figures (explaining minor upward shifts from offline syncs).'
+        ],
+        code: `docker compose exec workspace python3 -m sbetl.jobs.gold_watch_time`,
+        output: 'Total Watch Hours: 76,859.61 hrs | 2026-10 Recomputed Avg DAU: 318.3, MAU: 1,724.'
+      },
+      {
+        id: 'Q12',
+        num: 12,
+        phase: 'phase3',
+        phaseLabel: 'Phase 3: Gold Modeling',
+        stage: 'gold',
+        title: 'Subscription SCD Type 2 State Machine',
+        module: 'sbetl/jobs/subscription_state.py',
+        tags: ['SCD Type 2', 'Window lag/lead', 'Churn Analysis'],
+        objective: 'Construct a Slowly Changing Dimension Type 2 lifecycle table tracking plan upgrades, downgrades, grace-period payment recoveries, and involuntary churn.',
+        procedure: [
+          'Partition subscription events by user_id ordered by event_ts using PySpark lag/lead windows.',
+          'Classify payment_failed followed by renew within grace period as payment_failed_recovered (churn_type=None).',
+          'Classify unrecovered payment_failed transitions as churned_involuntary (churn_type="involuntary").'
+        ],
+        code: `scd2_df = df.withColumn(
+    "next_event", F.lead("event_type").over(user_win)
+).withColumn(
+    "status",
+    F.when((F.col("event_type") == "payment_failed") & (F.col("next_event") == "renew"), "payment_failed_recovered")
+     .when(F.col("event_type") == "payment_failed", "churned_involuntary")
+     .otherwise("active")
+)`,
+        output: 'Full SCD2 history generated with valid_from, valid_to, is_current, and accurate churn classification.'
+      },
+      {
+        id: 'Q13',
+        num: 13,
+        phase: 'phase3',
+        phaseLabel: 'Phase 3: Gold Modeling',
+        stage: 'gold',
+        title: 'Ad Break & Impression Analytics',
+        module: 'sbetl/jobs/ad_matching.py',
+        tags: ['AdTech', 'Deduplication', 'Fill Rate'],
+        objective: 'Deduplicate ad break and impression beacons on break_id and impression_id, calculating ad fill rates, completion rates, and frequency-cap compliance.',
+        procedure: [
+          'Deduplicate ad impressions on impression_id to prevent double-billing on client beacon retries.',
+          'Join impressions against ad_breaks on break_id within tolerance windows.',
+          'Compute fill rate, quartile completion rates, and hourly user ad-frequency caps.'
+        ],
+        code: `docker compose exec workspace python3 -m sbetl.jobs.ad_matching`,
+        output: 'Ad impressions deduplicated on impression_id; fill rates and completion analytics published to Gold.'
+      },
+      {
+        id: 'Q14',
+        num: 14,
+        phase: 'phase3',
+        phaseLabel: 'Phase 3: Gold Modeling',
+        stage: 'gold',
+        title: 'Payment & Gateway Settlement Reconciliation',
+        module: 'sbetl/jobs/gold_revenue.py',
+        tags: ['FinOps', 'Outer Join Reconciliation', 'INR'],
+        objective: 'Reconcile subscription billing charges against payment gateway settlements (PlayStore, UPI-Autopay, Razorpay) to isolate unsettled charges, refunds, and orphan settlements.',
+        procedure: [
+          'Perform full outer join between Silver subscription invoices and gateway settlement records.',
+          'Classify matched records as reconciled and flag missing settlements or orphan gateway credits.',
+          'Aggregate net settled INR revenue by payment provider and billing cycle.'
+        ],
+        code: `recon_df = charges.join(settlements, on="txn_id", how="full_outer").withColumn(
+    "recon_status",
+    F.when(F.col("charge_amt").isNotNull() & F.col("settled_amt").isNotNull(), "reconciled")
+     .when(F.col("settled_amt").isNull(), "unsettled_charge")
+     .otherwise("orphan_settlement")
+)`,
+        output: '16,008 charges reconciled totaling ₹3,467,742.00 INR; unsettled and orphan records isolated.'
+      },
+      {
+        id: 'Q15',
+        num: 15,
+        phase: 'phase3',
+        phaseLabel: 'Phase 3: Gold Modeling',
+        stage: 'gold',
+        title: 'Partner Royalty & Minimum Guarantee Floor',
+        module: 'sbetl/jobs/gold_revenue.py',
+        tags: ['Royalties', 'Minimum Guarantee', 'F.greatest'],
+        objective: 'Calculate quarterly content partner payouts weighted by platform watch-time share and contractual rev_share_pct, enforcing Minimum Guarantee (MG) floors.',
+        procedure: [
+          'Compute each partner’s quarterly watch_share from gold.watch_time_daily.',
+          'Calculate earned_royalty = total_settled_revenue_inr * watch_share * (rev_share_pct / 100).',
+          'Enforce contractual floor via payable_inr = F.greatest("earned_royalty", "minimum_guarantee").'
+        ],
+        code: `royalty_df = df.withColumn(
+    "earned_royalty",
+    F.round(F.col("total_settled_revenue_inr") * F.col("watch_share") * (F.col("rev_share_pct") / 100.0), 2)
+).withColumn(
+    "payable_inr", F.greatest(F.col("earned_royalty"), F.col("minimum_guarantee"))
+)`,
+        output: 'Quarterly partner royalties computed accurately with MG floors enforced (e.g., ₹20k earned → ₹2.5M MG payable).'
+      },
+      {
+        id: 'Q16',
+        num: 16,
+        phase: 'phase4',
+        phaseLabel: 'Phase 4: Serving & Ops',
+        stage: 'postgres',
+        title: 'Atomic PostgreSQL Warehouse Serving',
+        module: 'sbetl/jobs/serve_postgres.py',
+        tags: ['PostgreSQL', 'Staging Tables', 'ON CONFLICT'],
+        objective: 'Deliver Gold marts into PostgreSQL (ottdw) without exposing partially loaded or truncated tables to BI dashboards during batch refreshes.',
+        procedure: [
+          'Write Gold DataFrames via JDBC into temporary staging tables (_stg_<table_name>).',
+          'Execute a single atomic SQL transaction performing INSERT INTO target SELECT * FROM _stg ON CONFLICT DO UPDATE.',
+          'Expose business-ready views defined in sql/01_warehouse_ddl.sql.'
+        ],
+        code: `BEGIN;
+INSERT INTO ottdw.watch_time_daily
+SELECT * FROM ottdw._stg_watch_time_daily
+ON CONFLICT (watch_date, content_id)
+DO UPDATE SET watch_hours = EXCLUDED.watch_hours, updated_at = NOW();
+DROP TABLE ottdw._stg_watch_time_daily;
+COMMIT;`,
+        output: 'All 7 Gold analytical tables upserted atomically into PostgreSQL ottdw with zero dashboard downtime.'
+      },
+      {
+        id: 'Q17',
+        num: 17,
+        phase: 'phase4',
+        phaseLabel: 'Phase 4: Serving & Ops',
+        stage: 'postgres',
+        title: 'Airflow Workflow Orchestration & DQ Gating',
+        module: 'dags/streambharat_nightly.py',
+        tags: ['Apache Airflow', 'DAG', 'ShortCircuitOperator'],
+        objective: 'Orchestrate end-to-end dependencies from Bronze ingestion through Silver cleansing, Data Quality gating, Gold aggregation, and Postgres serving with automated retries.',
+        procedure: [
+          'Chain tasks: bronze_ingest >> silver_player >> quality_gate >> [gold_watch_time, gold_revenue] >> serve_postgres.',
+          'Use ShortCircuitOperator on sbetl.jobs.quality to halt downstream Gold loads if critical DQ failures exceed 10%.',
+          'Configure exponential backoff retries and SLA miss callbacks.'
+        ],
+        code: `bronze_task >> silver_task >> dq_gate_task >> [watch_time_task, revenue_task] >> serve_pg_task`,
+        output: 'Automated DAG pipeline with DQ circuit-breaker protection and idempotent task retries.'
+      },
+      {
+        id: 'Q18',
+        num: 18,
+        phase: 'phase4',
+        phaseLabel: 'Phase 4: Serving & Ops',
+        stage: 'bronze',
+        title: 'Consumer Lag & Pipeline Observability',
+        module: 'sbetl/jobs/monitoring.py',
+        tags: ['Observability', 'Consumer Lag', 'High Watermark'],
+        objective: 'Monitor streaming health by comparing committed Spark checkpoint offsets against Kafka broker partition high watermarks across all 13 topics.',
+        procedure: [
+          'Parse committed partition offsets from lake/_checkpoints/bronze_ingest/*/offsets/.',
+          'Query Kafka broker endOffsets (high watermarks) for each topic partition.',
+          'Report per-topic lag and Silver/Gold row-count health metrics.'
+        ],
+        code: `docker compose exec workspace python3 -m sbetl.jobs.monitoring`,
+        output: 'total_lag = 0 across all partitions; Silver and Gold table counts verified healthy.'
+      },
+      {
+        id: 'Q19',
+        num: 19,
+        phase: 'phase5',
+        phaseLabel: 'Phase 5: Drills & Runbook',
+        stage: 'bronze',
+        title: 'End-to-End Exactly-Once Chaos Drills',
+        module: 'docs/q19_drills.md',
+        tags: ['Chaos Engineering', 'Exactly-Once', 'Idempotency'],
+        objective: 'Validate zero data loss and zero double-counting across three failure drills: (1) workspace container kill, (2) Kafka broker outage, and (3) duplicate 2026-10-15 replay.',
+        procedure: [
+          'Execute docker compose restart workspace mid-stream and verify WAL checkpoint resumption.',
+          'Stop/start Kafka broker during ingestion and verify lag drains back to 0.',
+          'Replay 2026-10-15 twice and verify Before == After totals across Silver and Gold.'
+        ],
+        code: `# Duplicate 2026-10-15 replay drill
+docker compose exec workspace python3 producers/replay.py --from 2026-10-15 --to 2026-10-15 --speed 0
+docker compose exec workspace python3 -m sbetl.jobs.bronze_ingest --once
+docker compose exec workspace python3 -m sbetl.jobs.silver_player
+docker compose exec workspace python3 -m sbetl.jobs.gold_watch_time`,
+        output: '100% Metric Invariance: 1,240,983 player_events | 76,859.61 watch_hours | ₹3,467,742.00 revenue (0 variance).'
+      },
+      {
+        id: 'Q20',
+        num: 20,
+        phase: 'phase5',
+        phaseLabel: 'Phase 5: Drills & Runbook',
+        stage: 'silver',
+        title: 'Delta OPTIMIZE/ZORDER, Pytest Suite & Runbook',
+        module: 'tests/test_setup.py & docs/runbook.md',
+        tags: ['Delta OPTIMIZE', 'ZORDER', 'Pytest', 'Runbook'],
+        objective: 'Compact small streaming Parquet files using Delta OPTIMIZE + ZORDER BY (user_id, content_id), enforce VACUUM RETAIN 168 HOURS, validate all core transformations with 7 automated pytest tests, and author an on-call runbook.',
+        procedure: [
+          'Run OPTIMIZE on lake/bronze/player and OPTIMIZE ... ZORDER BY (user_id, content_id) on lake/silver/player_events.',
+          'Execute VACUUM RETAIN 168 HOURS (preserving 7-day time-travel snapshots for active checkpoints).',
+          'Run pytest -v inside workspace (7/7 passing) and publish SOPs in docs/runbook.md.'
+        ],
+        code: `spark.sql("OPTIMIZE delta.\`/opt/project/lake/bronze/player\`")
+spark.sql("OPTIMIZE delta.\`/opt/project/lake/silver/player_events\` ZORDER BY (user_id, content_id)")
+spark.sql("VACUUM delta.\`/opt/project/lake/silver/player_events\` RETAIN 168 HOURS")
+# Run pytest -v -> 7 passed`,
+        output: 'Small Parquet files compacted; 7/7 pytest tests passing; docs/runbook.md and docs/q19_drills.md finalized.'
+      }
+    ];
+
+    // Stage Metadata for Pipeline Interactive Inspector
+    const STAGE_INFO = {
+      kafka: {
+        kicker: 'STAGE 01 • INGESTION & MESSAGE BUS',
+        title: '1. Kafka Ingestion (13 Topics) — KRaft Mode & Idempotent Producer',
+        desc: 'Guarantees ordered per-user delivery (keyed by user_id) and zero duplicate broker writes during network retries via enable.idempotence=true and acks=all.',
+        path: 'producers/replay.py → kafka:9092 (13 topics)'
+      },
+      bronze: {
+        kicker: 'STAGE 02 • IMMUTABLE RAW LAKEHOUSE',
+        title: '2. Bronze Delta Lake (WAL Checkpoints) — Structured Streaming',
+        desc: 'Captures raw JSON payloads with (topic, partition, offset, ingested_at) lineage. Survives container kills and broker outages by resuming strictly from committed WAL offsets in lake/_checkpoints/.',
+        path: 'lake/bronze/* + lake/_checkpoints/*'
+      },
+      silver: {
+        kicker: 'STAGE 03 • CLEANSED & NORMALIZED LAKEHOUSE',
+        title: '3. Silver Delta Lake (Schema v1/v2 & Skew) — Cleansing & Deduplication',
+        desc: 'Normalizes Android 7.3.0 position_ms to seconds, converts IST to UTC, clamps skewed future device clocks while preserving offline syncs, and deduplicates on business keys (event_id).',
+        path: 'lake/silver/player_events (1,240,983 rows)'
+      },
+      gold: {
+        kicker: 'STAGE 04 • BUSINESS AGGREGATIONS & FINOPS',
+        title: '4. Gold Delta Lake (Sessions, SCD2, Royalties) — Analytical Marts',
+        desc: 'Computes runaway-capped viewing sessions (76,859.61 hrs), SCD Type 2 churn/recovery states, gateway revenue reconciliation (₹3,467,742.00), and Minimum Guarantee partner royalties.',
+        path: 'lake/gold/{watch_time_daily,active_users,revenue}'
+      },
+      postgres: {
+        kicker: 'STAGE 05 • ATOMIC BI WAREHOUSE SERVING',
+        title: '5. PostgreSQL ottdw (Atomic Upserts) & Airflow Orchestration',
+        desc: 'Loads Gold marts into temporary _stg_* tables and swaps into production tables in a single ACID transaction via INSERT ... ON CONFLICT DO UPDATE, orchestrated by Airflow with DQ circuit breakers.',
+        path: 'serve_postgres.py → postgres:5432/ottdw'
+      }
+    };
+
+    // Chaos Drill Data for Q19 Simulator
+    const DRILLS_DATA = {
+      drill1: {
+        title: 'Drill 1: Mid-Replay Container Kill & Checkpoint Recovery',
+        command: 'docker compose restart workspace && docker compose exec workspace python3 -m sbetl.jobs.bronze_ingest --once',
+        summary: 'Abruptly restarts the Spark workspace container while micro-batches are writing to Delta Lake. Upon restart, Structured Streaming reads the committed offset range from lake/_checkpoints/bronze_ingest/, processes strictly unread offsets, and brings consumer lag back to 0.',
+        mechanism: 'Spark Structured Streaming Write-Ahead Log (WAL) + Delta Lake ACID Transaction Log (_delta_log).',
+        logs: [
+          '[09:14:02] Injecting fault: docker compose restart workspace...',
+          '[09:14:06] Container workspace restarted. Inspecting lake/_checkpoints/bronze_ingest/player/offsets/...',
+          '[09:14:09] Resuming Structured Streaming from committed batch #14 (offset 1,240,983)...',
+          '[09:14:13] Running sbetl.jobs.monitoring -> Verified total_lag = 0 across all 13 topics. EXACTLY-ONCE VERIFIED.'
+        ],
+        metrics: [
+          { name: 'Kafka Consumer Lag (All 13 Topics)', before: '0', after: '0', variance: '0 (Exact Match)' },
+          { name: 'silver.player_events Clean Rows', before: '1,240,983', after: '1,240,983', variance: '0 (Exact Match)' },
+          { name: 'gold.watch_time_daily Watch Hours', before: '76,859.61', after: '76,859.61', variance: '0.00 (Exact Match)' },
+          { name: 'Corrupt / Partial Delta Commits', before: '0', after: '0', variance: '0 (ACID Protected)' }
+        ]
+      },
+      drill2: {
+        title: 'Drill 2: Kafka Broker Outage (Stop / Start) During Ingestion',
+        command: 'docker compose stop kafka && sleep 5 && docker compose start kafka && docker compose exec workspace python3 -m sbetl.jobs.monitoring',
+        summary: 'Simulates an abrupt Kafka broker outage mid-pipeline. Producers and Spark consumers retry cleanly without corrupting checkpoint metadata, reconnecting immediately upon broker recovery to drain remaining messages with zero duplicates.',
+        mechanism: 'Idempotent Kafka Producer (enable.idempotence=true, acks=all) + Checkpointed Spark Kafka Source.',
+        logs: [
+          '[09:16:10] Injecting fault: docker compose stop kafka (5s outage window)...',
+          '[09:16:15] Broker offline. Spark streaming state safe in _delta_log & WAL checkpoints.',
+          '[09:16:16] Recovering broker: docker compose start kafka...',
+          '[09:16:21] Reconnected to kafka:9092. Verified high watermarks match committed offsets (lag = 0).'
+        ],
+        metrics: [
+          { name: 'Partition High-Watermark Sync', before: '100% Synced', after: '100% Synced', variance: '0 Offset Gap' },
+          { name: 'silver.player_events Clean Rows', before: '1,240,983', after: '1,240,983', variance: '0 (Exact Match)' },
+          { name: 'gold.revenue_reconciliation (INR)', before: '₹3,467,742.00', after: '₹3,467,742.00', variance: '₹0.00 (Exact Match)' },
+          { name: 'Lost / Skipped Messages', before: '0', after: '0', variance: '0 (Exact Match)' }
+        ]
+      },
+      drill3: {
+        title: 'Drill 3: Duplicate Day Replay (2026-10-15 Schema v2 Cutover Day)',
+        command: 'python3 producers/replay.py --from 2026-10-15 --to 2026-10-15 --speed 0 && python3 -m sbetl.jobs.silver_player && python3 -m sbetl.jobs.gold_watch_time',
+        summary: 'Replays the 2026-10-15 Schema v2 cutover day a second time into Kafka, generating brand-new Kafka offsets for identical business events. Silver business-key deduplication (event_id) and Gold deterministic overwrites keep all metrics 100% invariant.',
+        mechanism: 'Delta Lake Business-Key Deduplication (dropDuplicates(["event_id"])) + Deterministic Gold Partition Overwrites.',
+        logs: [
+          '[09:18:01] Snapshot BEFORE replay: player_events=1,240,983 | watch_hours=76,859.61 | rev=₹3,467,742.00',
+          '[09:18:04] Replaying 2026-10-15 (Schema v2 cutover) a second time into Kafka...',
+          '[09:18:11] Bronze appended audit records. Running Silver deduplication & Gold recomputation...',
+          '[09:18:19] Snapshot AFTER replay:  player_events=1,240,983 | watch_hours=76,859.61 | rev=₹3,467,742.00 (VARIANCE = 0).'
+        ],
+        metrics: [
+          { name: 'silver.player_events Distinct Events', before: '1,240,983', after: '1,240,983', variance: '0 (Exact Match)' },
+          { name: 'gold.watch_time_daily Total Watch Hours', before: '76,859.61', after: '76,859.61', variance: '0.00 (Exact Match)' },
+          { name: 'gold.active_users (2026-10 Avg DAU / MAU)', before: '318.3 / 1,724', after: '318.3 / 1,724', variance: '0 (Exact Match)' },
+          { name: 'gold.revenue_reconciliation (INR)', before: '₹3,467,742.00', after: '₹3,467,742.00', variance: '₹0.00 (Exact Match)' }
+        ]
+      }
+    };
+
+    // State Management
+    let activePhase = 'all';
+    let activeStage = null;
+    let searchQuery = '';
+    let selectedQuestionId = 'Q1';
+    let activeDrillId = 'drill1';
+
+    // Toast Utility
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      const msgEl = document.getElementById('toast-msg');
+      msgEl.textContent = message;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 2400);
+    }
+
+    // Safe Clipboard Copy (Uses execCommand fallback for iFrames / GitHub Pages)
+    function copyRawText(text) {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showToast('Copied to clipboard!');
+      } catch (err) {
+        showToast('Unable to copy automatically.');
+      }
+      document.body.removeChild(textarea);
+    }
+
+    function copyTextById(elementId) {
+      const el = document.getElementById(elementId);
+      if (el) copyRawText(el.innerText);
+    }
+
+    // Pipeline Stage Selection
+    function selectPipelineStage(stage) {
+      activeStage = stage;
+      document.querySelectorAll('.pipeline-node').forEach(node => {
+        node.classList.remove('is-selected');
+      });
+
+      const clearBtn = document.getElementById('clear-stage-btn');
+      const kicker = document.getElementById('stage-banner-kicker');
+      const title = document.getElementById('stage-banner-title');
+      const desc = document.getElementById('stage-banner-desc');
+      const path = document.getElementById('stage-banner-path');
+
+      if (stage && STAGE_INFO[stage]) {
+        document.getElementById('node-' + stage).classList.add('is-selected');
+        clearBtn.classList.remove('hidden');
+        kicker.textContent = STAGE_INFO[stage].kicker;
+        title.textContent = STAGE_INFO[stage].title;
+        desc.textContent = STAGE_INFO[stage].desc;
+        path.textContent = STAGE_INFO[stage].path;
+      } else {
+        clearBtn.classList.add('hidden');
+        kicker.textContent = 'END-TO-END ARCHITECTURE OVERVIEW';
+        title.textContent = 'Click any pipeline stage block above to inspect guarantees and filter questions';
+        desc.textContent = 'Every stage enforces strict idempotency: Kafka producer retries are deduplicated by broker sequence numbers, Spark Structured Streaming tracks offsets via WAL checkpoints, Silver deduplicates on business keys, and Postgres loads atomically via staging tables.';
+        path.textContent = 'lake/{bronze,silver,gold} → ottdw';
+      }
+
+      renderQuestionList();
+    }
+
+    // Phase Pill Selection
+    function selectPhase(phase) {
+      activePhase = phase;
+      document.querySelectorAll('.filter-pill').forEach(btn => {
+        if (btn.dataset.phase === phase) {
+          btn.classList.add('is-selected');
+        } else {
+          btn.classList.remove('is-selected');
+        }
+      });
+      renderQuestionList();
+    }
+
+    // Search Handler
+    function handleSearch(val) {
+      searchQuery = val.trim().toLowerCase();
+      renderQuestionList();
+    }
+
+    // Render Master Question List & Detail Panel
+    function renderQuestionList() {
+      const listContainer = document.getElementById('question-list');
+      const filtered = QUESTIONS_DATA.filter(q => {
+        const matchesPhase = activePhase === 'all' || q.phase === activePhase;
+        const matchesStage = !activeStage || q.stage === activeStage;
+        const matchesSearch = !searchQuery ||
+          q.id.toLowerCase().includes(searchQuery) ||
+          q.title.toLowerCase().includes(searchQuery) ||
+          q.module.toLowerCase().includes(searchQuery) ||
+          q.objective.toLowerCase().includes(searchQuery) ||
+          q.tags.some(t => t.toLowerCase().includes(searchQuery));
+        return matchesPhase && matchesStage && matchesSearch;
+      });
+
+      if (filtered.length === 0) {
+        listContainer.innerHTML = `
+          <div class="glass-card rounded-2xl p-6 text-center space-y-2">
+            <div class="text-slate-100 font-semibold text-sm">No matching questions found</div>
+            <p class="text-xs text-slate-300">Try clearing your stage filter or search query.</p>
+            <button type="button" onclick="resetFilters()" class="mt-2 px-3 py-1.5 rounded-lg bg-sky-500/20 border border-sky-400/50 text-sky-200 font-semibold text-xs">Show All Layers</button>
+          </div>
+        `;
+        return;
+      }
+
+      // Ensure selectedQuestionId is visible in filtered list, else pick first
+      if (!filtered.some(q => q.id === selectedQuestionId)) {
+        selectedQuestionId = filtered[0].id;
+      }
+
+      listContainer.innerHTML = filtered.map(q => {
+        const isActive = q.id === selectedQuestionId;
+        return `
+          <button type="button" onclick="selectQuestion('${q.id}')" class="interactive-block ${isActive ? 'is-selected' : ''} w-full text-left rounded-xl p-4">
+            <div class="flex items-center justify-between gap-2">
+              <span class="font-mono text-xs font-bold px-2.5 py-0.5 rounded border ${isActive ? 'bg-sky-500/25 text-sky-200 border-sky-400/60' : 'bg-slate-900 text-amber-300 border-slate-700'}">
+                ${q.id}
+              </span>
+              <span class="text-[11px] font-mono text-slate-300 truncate">${q.module}</span>
+            </div>
+            <div class="block-title mt-2 font-bold text-sm text-slate-50">${q.title}</div>
+            <div class="mt-2 flex flex-wrap gap-1.5">
+              ${q.tags.map(t => `<span class="block-tag text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-200 border border-slate-700/80">${t}</span>`).join('')}
+            </div>
+          </button>
+        `;
+      }).join('');
+
+      renderQuestionDetail(selectedQuestionId);
+    }
+
+    function resetFilters() {
+      activePhase = 'all';
+      activeStage = null;
+      searchQuery = '';
+      document.getElementById('search-input').value = '';
+      selectPipelineStage(null);
+      selectPhase('all');
+    }
+
+    function selectQuestion(qId) {
+      selectedQuestionId = qId;
+      renderQuestionList();
+    }
+
+    function renderQuestionDetail(qId) {
+      const q = QUESTIONS_DATA.find(item => item.id === qId) || QUESTIONS_DATA[0];
+      const detailContainer = document.getElementById('question-detail');
+
+      const escapedCode = q.code
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+      detailContainer.innerHTML = `
+        <div class="space-y-4 border-b border-slate-800 pb-5">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="font-mono text-xs font-extrabold px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-200 border border-sky-400/50">${q.id}</span>
+              <span class="text-xs font-mono text-amber-300">${q.phaseLabel}</span>
+            </div>
+            <span class="text-xs font-mono px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-slate-200">
+              ${q.module}
+            </span>
+          </div>
+          <h3 class="text-xl sm:text-2xl font-extrabold text-slate-50 leading-snug">${q.title}</h3>
+          <div class="flex flex-wrap gap-1.5">
+            ${q.tags.map(t => `<span class="text-xs font-mono px-2.5 py-0.5 rounded-full bg-sky-500/15 text-sky-200 border border-sky-400/30">${t}</span>`).join('')}
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <h4 class="text-xs font-mono uppercase tracking-wider text-amber-300 font-semibold">Engineering Objective</h4>
+          <p class="text-sm text-slate-100 leading-relaxed">${q.objective}</p>
+        </div>
+
+        <div class="space-y-2">
+          <h4 class="text-xs font-mono uppercase tracking-wider text-sky-300 font-semibold">Step-by-Step Execution Procedure</h4>
+          <ol class="list-decimal list-inside space-y-1.5 text-sm text-slate-200">
+            ${q.procedure.map(step => `<li class="leading-relaxed">${step}</li>`).join('')}
+          </ol>
+        </div>
+
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <h4 class="text-xs font-mono uppercase tracking-wider text-slate-300 font-semibold">Implementation Snippet</h4>
+            <button type="button" onclick="copyDetailCode('${q.id}')" class="text-xs font-mono px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-300 border border-slate-700 transition flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+              <span>Copy</span>
+            </button>
+          </div>
+          <pre class="bg-[#090D16] border border-slate-800 rounded-xl p-4 font-mono text-xs text-sky-200 overflow-x-auto leading-relaxed">${escapedCode}</pre>
+        </div>
+
+        <div class="rounded-xl bg-emerald-500/15 border border-emerald-400/40 p-4 space-y-1">
+          <div class="text-xs font-mono font-bold text-emerald-300 uppercase tracking-wider">✓ Verified Metric / Output Badge</div>
+          <p class="text-xs sm:text-sm text-slate-100 font-mono leading-relaxed">${q.output}</p>
+        </div>
+      `;
+    }
+
+    function copyDetailCode(qId) {
+      const q = QUESTIONS_DATA.find(item => item.id === qId);
+      if (q) copyRawText(q.code);
+    }
+
+    // Q19 Chaos Drill Simulator Logic
+    function selectDrill(drillId) {
+      activeDrillId = drillId;
+      document.querySelectorAll('.drill-tab').forEach(btn => {
+        btn.classList.remove('is-selected');
+      });
+      document.getElementById('btn-' + drillId).classList.add('is-selected');
+
+      const drill = DRILLS_DATA[drillId];
+      document.getElementById('drill-command').textContent = drill.command;
+      document.getElementById('drill-title').textContent = drill.title;
+      document.getElementById('drill-summary').textContent = drill.summary;
+      document.getElementById('drill-mechanism').textContent = drill.mechanism;
+      document.getElementById('drill-log-box').classList.add('hidden');
+
+      const tbody = document.getElementById('drill-table-body');
+      tbody.innerHTML = drill.metrics.map(m => `
+        <tr class="hover:bg-slate-900/80 transition">
+          <td class="py-3 px-3 text-slate-100 font-sans font-medium">${m.name}</td>
+          <td class="py-3 px-3 text-right text-slate-200">${m.before}</td>
+          <td class="py-3 px-3 text-right text-sky-300 font-semibold">${m.after}</td>
+          <td class="py-3 px-3 text-right text-emerald-300 font-semibold">${m.variance}</td>
+        </tr>
+      `).join('');
+    }
+
+    function runDrillSimulation() {
+      const drill = DRILLS_DATA[activeDrillId];
+      const logBox = document.getElementById('drill-log-box');
+      const btn = document.getElementById('run-drill-btn');
+
+      logBox.innerHTML = '';
+      logBox.classList.remove('hidden');
+      btn.disabled = true;
+      btn.classList.add('opacity-60');
+
+      drill.logs.forEach((line, idx) => {
+        setTimeout(() => {
+          const div = document.createElement('div');
+          div.textContent = line;
+          logBox.appendChild(div);
+          if (idx === drill.logs.length - 1) {
+            btn.disabled = false;
+            btn.classList.remove('opacity-60');
+            showToast('Chaos drill verified: 0 variance!');
+          }
+        }, idx * 450);
+      });
+    }
+
+    // Quick-Start Modal Controls
+    function openQuickStartModal() {
+      const modal = document.getElementById('quickstart-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeQuickStartModal() {
+      const modal = document.getElementById('quickstart-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    // Initialize Application on Load
+    window.addEventListener('DOMContentLoaded', () => {
+      renderQuestionList();
+      selectDrill('drill1');
+    });
+  </script>
+</body>
+</html>
